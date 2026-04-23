@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL Agent - Chat Interface</title>
+    <style>
+        :root {
+            --primary: #6c5ce7;
+            --primary-dark: #5b4bc4;
+            --secondary: #a8e6cf;
+            --success: #2aa180;
+            --danger: #ff7675;
+            --warning: #ffeaa7;
+            --info: #74b9ff;
+            --light: #f5f6fa;
+            --dark: #2d3436;
+            --gray: #b2bec3;
+            --gray-light: #dfe6e9;
+            --user-bubble: #6c5ce7;
+            --bot-bubble: #f5f6fa;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            overflow: hidden;
+            color: var(--dark);
+        }
+
+        .app-container {
+            display: flex;
+            height: 100vh;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+        }
+
+        .sidebar {
+            width: 320px;
+            background: white;
+            border-right: 1px solid var(--gray-light);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-header {
+            padding: 24px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+        }
+
+        .sidebar-header h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .database-info {
+            padding: 20px;
+            background: var(--light);
+            border-bottom: 1px solid var(--gray-light);
+        }
+
+        .health-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 8px;
+            font-size: 0.9rem;
+        }
+
+        .health-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--danger);
+        }
+
+        .health-dot.healthy {
+            background: var(--success);
+        }
+
+        .tables-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }
+
+        .table-item {
+            margin-bottom: 8px;
+            border: 1px solid var(--gray-light);
+            border-radius: 8px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .table-item:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .table-header {
+            padding: 16px;
+            background: var(--light);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .table-header:hover {
+            background: #e3f2fd;
+        }
+
+        .table-name {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+            color: var(--dark);
+        }
+
+        .table-icon {
+            color: var(--primary);
+        }
+
+        .expand-icon {
+            transition: transform 0.3s ease;
+            color: var(--gray);
+        }
+
+        .table-header.active .expand-icon {
+            transform: rotate(180deg);
+            color: var(--primary);
+        }
+
+        .columns-container {
+            background: white;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+
+        .table-header.active + .columns-container {
+            max-height: 400px;
+            padding: 8px 0;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .header {
+            padding: 24px;
+            background: white;
+            border-bottom: 1px solid var(--gray-light);
+        }
+
+        .header h2 {
+            font-size: 1.75rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            margin: 24px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .chat-header {
+            padding: 20px 24px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .chat-header h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        .chat-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: #fafafa;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .message {
+            display: flex;
+            gap: 12px;
+            max-width: 80%;
+            animation: messageSlide 0.3s ease;
+        }
+
+        @keyframes messageSlide {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message.user {
+            align-self: flex-end;
+            flex-direction: row-reverse;
+        }
+
+        .message.bot {
+            align-self: flex-start;
+        }
+
+        .avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+
+        .user .avatar {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+        }
+
+        .bot .avatar {
+            background: var(--gray-light);
+            color: var(--dark);
+        }
+
+        .message-content {
+            padding: 16px;
+            border-radius: 18px;
+            line-height: 1.5;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .user .message-content {
+            background: var(--user-bubble);
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .bot .message-content {
+            background: var(--bot-bubble);
+            color: var(--dark);
+            border-bottom-left-radius: 4px;
+        }
+
+        .chat-input-container {
+            padding: 20px;
+            border-top: 1px solid var(--gray-light);
+            background: white;
+        }
+
+        .chat-input-wrapper {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+        }
+
+        .chat-input {
+            flex: 1;
+            min-height: 60px;
+            max-height: 120px;
+            padding: 16px;
+            border: 2px solid var(--gray-light);
+            border-radius: 8px;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.95rem;
+            resize: none;
+            transition: all 0.3s ease;
+            background: var(--light);
+        }
+
+        .chat-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            background: white;
+            box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.1);
+        }
+
+        .send-button {
+            padding: 16px 20px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+        }
+
+        .send-button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(67, 97, 238, 0.4);
+        }
+
+        .send-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+            margin: 8px 0;
+        }
+
+        .data-table th {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            padding: 12px 16px;
+            text-align: left;
+            font-weight: 600;
+            border: none;
+        }
+
+        .data-table td {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--gray-light);
+            vertical-align: top;
+        }
+
+        .data-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .welcome-message {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--gray);
+        }
+
+        .welcome-message h3 {
+            margin-bottom: 12px;
+            color: var(--dark);
+        }
+
+        .welcome-message p {
+            margin-bottom: 8px;
+            line-height: 1.6;
+        }
+
+        .typing-indicator {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 16px;
+            background: var(--bot-bubble);
+            border-radius: 18px;
+            border-bottom-left-radius: 4px;
+            max-width: fit-content;
+        }
+
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--gray);
+            animation: typingAnimation 1.4s infinite ease-in-out;
+        }
+
+        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes typingAnimation {
+            0%, 80%, 100% { transform: scale(0.8); opacity: 0.5; }
+            40% { transform: scale(1); opacity: 1; }
+        }
+
+        .chat-messages::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .chat-messages::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 3px;
+        }
+
+        .chat-messages::-webkit-scrollbar-thumb {
+            background: var(--primary);
+            border-radius: 3px;
+        }
+
+        @media (max-width: 768px) {
+            .app-container {
+                flex-direction: column;
+            }
+            
+            .sidebar {
+                width: 100%;
+                height: auto;
+            }
+            
+            .message {
+                max-width: 90%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h1>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 3h7a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-7m0-18H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h7m0-18v18"/>
+                    </svg>
+                    SQL Agent
+                </h1>
+            </div>
+            
+            <div class="database-info">
+                <div style="font-weight: 600; color: var(--dark);">Database Connection</div>
+                <div class="health-status">
+                    <div class="health-dot" id="health-dot"></div>
+                    <span id="health-text">Checking health...</span>
+                </div>
+            </div>
+            
+            <div class="tables-container" id="tables-container">
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="header">
+                <h2>SQL Agent</h2>
+            </div>
+
+            <div class="chat-container">
+                <div class="chat-header">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                    <h3>Chat with SQL Agent</h3>
+                </div>
+                
+                <div class="chat-messages" id="chat-messages">
+                    <div class="welcome-message">
+                        <h3>Welcome to SQL Agent! 👋</h3>
+                        <p>I can help you query your database using natural language.</p>
+                        <p>Try asking questions like:</p>
+                        <p>"Show me all customers from USA"</p>
+                        <p>"What are the top 5 selling albums?"</p>
+                        <p>"How many employees were hired last year?"</p>
+                    </div>
+                </div>
+                
+                <div class="chat-input-container">
+                    <div class="chat-input-wrapper">
+                        <textarea 
+                            class="chat-input" 
+                            id="chat-input" 
+                            placeholder="Ask me anything about your data..."
+                            rows="1"
+                        ></textarea>
+                        <button class="send-button" id="send-button">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="22" y1="2" x2="11" y2="13"></line>
+                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                            </svg>
+                            Send
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'https://sql-agent-backend.vercel.app/';
+
+        const elements = {
+            chatInput: document.getElementById('chat-input'),
+            sendButton: document.getElementById('send-button'),
+            chatMessages: document.getElementById('chat-messages'),
+            tablesContainer: document.getElementById('tables-container'),
+            healthDot: document.getElementById('health-dot'),
+            healthText: document.getElementById('health-text')
+        };
+
+        let conversationHistory = [];
+
+        class ResponseFormatter {
+            static formatMarkdownTable(markdownText) {
+                const lines = markdownText.split('\n').filter(line => line.trim());
+                const tableRows = lines.filter(line => line.includes('|'));
+                
+                if (tableRows.length < 2) return markdownText;
+                
+                const headers = tableRows[0]
+                    .split('|')
+                    .filter(cell => cell.trim())
+                    .map(cell => cell.trim());
+                
+                const dataRows = tableRows.slice(2)
+                    .map(row => 
+                        row.split('|')
+                           .filter(cell => cell.trim())
+                           .map(cell => cell.trim())
+                    )
+                    .filter(row => row.length === headers.length);
+                
+                if (headers.length === 0 || dataRows.length === 0) return markdownText;
+                
+                let html = '<table class="data-table">';
+                
+                html += '<thead><tr>';
+                headers.forEach(header => {
+                    html += `<th>${this.escapeHtml(header)}</th>`;
+                });
+                html += '</tr></thead>';
+                
+                html += '<tbody>';
+                dataRows.forEach(row => {
+                    html += '<tr>';
+                    row.forEach(cell => {
+                        html += `<td>${this.escapeHtml(cell)}</td>`;
+                    });
+                    html += '</tr>';
+                });
+                html += '</tbody></table>';
+                
+                return html;
+            }
+
+            static formatTextResponse(text) {
+                if (text.includes('|') && text.includes('-|-')) {
+                    return this.formatMarkdownTable(text);
+                }
+                
+                const paragraphs = text.split('\n\n').filter(p => p.trim());
+                let html = '';
+                paragraphs.forEach(paragraph => {
+                    if (paragraph.includes('|') && paragraph.split('\n').some(line => line.includes('|'))) {
+                        html += this.formatMarkdownTable(paragraph);
+                    } else {
+                        html += `<p>${this.escapeHtml(paragraph)}</p>`;
+                    }
+                });
+                
+                return html;
+            }
+
+            static escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+
+            static formatResponse(answer) {
+                if (typeof answer !== 'string') {
+                    return '<p>' + this.escapeHtml(JSON.stringify(answer)) + '</p>';
+                }
+
+                const cleanAnswer = answer.trim();
+                return this.formatTextResponse(cleanAnswer);
+            }
+        }
+
+        class SQLAgentAPI {
+            static async checkHealth() {
+                try {
+                    const response = await fetch(`${API_BASE_URL}/health`);
+                    return await response.json();
+                } catch (error) {
+                    throw new Error(`Backend unavailable: ${error.message}`);
+                }
+            }
+
+            static async fetchTables() {
+                try {
+                    const response = await fetch(`${API_BASE_URL}/tables`);
+                    return await response.json();
+                } catch (error) {
+                    throw new Error(`Failed to fetch tables: ${error.message}`);
+                }
+            }
+
+            static async sendQuery(question) {
+                try {
+                    const response = await fetch(`${API_BASE_URL}/query`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ question })
+                    });
+                    return await response.json();
+                } catch (error) {
+                    throw new Error(`Query failed: ${error.message}`);
+                }
+            }
+        }
+
+        class ChatManager {
+            static addMessage(content, isUser = false, isTyping = false) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `message ${isUser ? 'user' : 'bot'}`;
+                
+                if (isTyping) {
+                    messageDiv.innerHTML = `
+                        <div class="avatar">AI</div>
+                        <div class="typing-indicator">
+                            <div class="typing-dot"></div>
+                            <div class="typing-dot"></div>
+                            <div class="typing-dot"></div>
+                        </div>
+                    `;
+                } else {
+                    messageDiv.innerHTML = `
+                        <div class="avatar">${isUser ? 'You' : 'AI'}</div>
+                        <div class="message-content">${content}</div>
+                    `;
+                }
+                
+                elements.chatMessages.appendChild(messageDiv);
+                elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
+                
+                return messageDiv;
+            }
+
+            static clearWelcomeMessage() {
+                const welcomeMessage = elements.chatMessages.querySelector('.welcome-message');
+                if (welcomeMessage) {
+                    welcomeMessage.remove();
+                }
+            }
+
+            static async sendMessage(question) {
+                this.clearWelcomeMessage();
+                this.addMessage(question, true);
+                
+                const typingIndicator = this.addMessage('', false, true);
+                
+                elements.sendButton.disabled = true;
+                elements.chatInput.disabled = true;
+                
+                try {
+                    const result = await SQLAgentAPI.sendQuery(question);
+                    
+                    typingIndicator.remove();
+                    
+                    const formattedResponse = ResponseFormatter.formatResponse(result.answer);
+                    this.addMessage(formattedResponse, false);
+                    
+                    conversationHistory.push({
+                        question,
+                        answer: result.answer,
+                        success: result.success,
+                        timestamp: new Date().toISOString()
+                    });
+                    
+                } catch (error) {
+                    typingIndicator.remove();
+                    
+                    this.addMessage(`Sorry, I encountered an error: ${error.message}`, false);
+                } finally {
+                    elements.sendButton.disabled = false;
+                    elements.chatInput.disabled = false;
+                    elements.chatInput.focus();
+                }
+            }
+        }
+
+        class UIManager {
+            static updateHealthStatus(healthData) {
+                if (healthData.database_connected) {
+                    elements.healthDot.classList.add('healthy');
+                    elements.healthText.textContent = 'Database connected';
+                    elements.healthText.style.color = 'var(--success)';
+                } else {
+                    elements.healthDot.classList.remove('healthy');
+                    elements.healthText.textContent = 'Database disconnected';
+                    elements.healthText.style.color = 'var(--danger)';
+                }
+            }
+
+            static async renderTables(tables) {
+                elements.tablesContainer.innerHTML = '';
+                
+                if (!tables || tables.length === 0) {
+                    elements.tablesContainer.innerHTML = `
+                        <div style="text-align: center; padding: 40px; color: var(--gray);">
+                            <p>No tables found in database</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                for (const table of tables) {
+                    const tableItem = document.createElement('div');
+                    tableItem.className = 'table-item';
+                    
+                    tableItem.innerHTML = `
+                        <div class="table-header">
+                            <div class="table-name">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="table-icon">
+                                    <path d="M12 3h7a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-7m0-18H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h7m0-18v18"/>
+                                </svg>
+                                ${table}
+                            </div>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="expand-icon">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </div>
+                        <div class="columns-container">
+                            <div class="loading-placeholder" style="padding: 16px; text-align: center; color: var(--gray); font-style: italic;">
+                                Click to load columns...
+                            </div>
+                        </div>
+                    `;
+                    
+                    const tableHeader = tableItem.querySelector('.table-header');
+                    const columnsContainer = tableItem.querySelector('.columns-container');
+                    let columnsLoaded = false;
+                    
+                    tableHeader.addEventListener('click', async () => {
+                        tableHeader.classList.toggle('active');
+                        
+                        if (tableHeader.classList.contains('active') && !columnsLoaded) {
+                            columnsContainer.innerHTML = `
+                                <div style="padding: 16px; text-align: center;">
+                                    <div class="typing-indicator" style="justify-content: center;">
+                                        <div class="typing-dot"></div>
+                                        <div class="typing-dot"></div>
+                                        <div class="typing-dot"></div>
+                                    </div>
+                                    <span style="color: var(--gray); font-size: 0.85rem;">Loading schema...</span>
+                                </div>
+                            `;
+                            
+                            try {
+                                const response = await fetch(`${API_BASE_URL}/table-schema/${encodeURIComponent(table)}`);
+                                
+                                if (!response.ok) {
+                                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                                }
+                                
+                                const data = await response.json();
+                                
+                                if (data.columns && data.columns.length > 0) {
+                                    let columnsHtml = `
+                                        <div style="padding: 12px;">
+                                            <table style="width: 100%; font-size: 0.8rem; border-collapse: collapse;">
+                                                <thead>
+                                                    <tr style="background: var(--light); border-bottom: 2px solid var(--gray-light);">
+                                                        <th style="padding: 10px; text-align: left; font-weight: 600;">📄 Column Name</th>
+                                                        <th style="padding: 10px; text-align: left; font-weight: 600;">📊 Type</th>
+                                                        <th style="padding: 10px; text-align: center; font-weight: 600;">🔑 PK</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                    `;
+                                    
+                                    data.columns.forEach(col => {
+                                        const columnName = typeof col === 'string' ? col : col.name;
+                                        const columnType = typeof col === 'object' ? col.type || 'Unknown' : 'Unknown';
+                                        const isPK = typeof col === 'object' ? (col.primary_key ? '✓' : '') : '';
+                                        
+                                        columnsHtml += `
+                                            <tr style="border-bottom: 1px solid var(--gray-light);">
+                                                <td style="padding: 10px; font-family: monospace;">${this.escapeHtml(columnName)}</td>
+                                                <td style="padding: 10px; color: var(--gray);">${this.escapeHtml(columnType)}</td>
+                                                <td style="padding: 10px; text-align: center; color: var(--success);">${isPK}</td>
+                                            </tr>
+                                        `;
+                                    });
+                                    
+                                    columnsHtml += `
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    `;
+                                    columnsContainer.innerHTML = columnsHtml;
+                                    columnsLoaded = true;
+                                } else if (data.raw_schema) {
+                                    columnsContainer.innerHTML = `
+                                        <div style="padding: 16px;">
+                                            <details>
+                                                <summary style="cursor: pointer; color: var(--primary); font-weight: 500; margin-bottom: 10px;">
+                                                    📋 View Raw Schema
+                                                </summary>
+                                                <pre style="font-size: 0.7rem; overflow-x: auto; background: var(--light); padding: 12px; border-radius: 8px; margin-top: 8px;">${this.escapeHtml(data.raw_schema.substring(0, 1000))}${data.raw_schema.length > 1000 ? '...' : ''}</pre>
+                                            </details>
+                                        </div>
+                                    `;
+                                    columnsLoaded = true;
+                                } else {
+                                    columnsContainer.innerHTML = `
+                                        <div style="padding: 16px; text-align: center; color: var(--warning);">
+                                            ⚠️ No column information available for this table
+                                        </div>
+                                    `;
+                                    columnsLoaded = true;
+                                }
+                            } catch (error) {
+                                console.error('Error loading columns:', error);
+                                columnsContainer.innerHTML = `
+                                    <div style="padding: 16px; text-align: center; color: var(--danger);">
+                                        ❌ Error loading columns: ${this.escapeHtml(error.message)}
+                                    </div>
+                                `;
+                                columnsLoaded = true;
+                            }
+                        }
+                    });
+                    
+                    elements.tablesContainer.appendChild(tableItem);
+                }
+            }
+
+            static escapeHtml(text) {
+                if (!text) return '';
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+        }
+
+        class EventHandlers {
+            static async handleSendMessage() {
+                const question = elements.chatInput.value.trim();
+                
+                if (!question) {
+                    return;
+                }
+                
+                elements.chatInput.value = '';
+                EventHandlers.adjustTextareaHeight();
+                
+                await ChatManager.sendMessage(question);
+            }
+
+            static handleKeyPress(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    EventHandlers.handleSendMessage();
+                }
+            }
+
+            static adjustTextareaHeight() {
+                elements.chatInput.style.height = 'auto';
+                elements.chatInput.style.height = Math.min(elements.chatInput.scrollHeight, 120) + 'px';
+            }
+        }
+    
+        class App {
+            static async initialize() {
+                elements.sendButton.addEventListener('click', EventHandlers.handleSendMessage);
+                elements.chatInput.addEventListener('keypress', EventHandlers.handleKeyPress);
+                elements.chatInput.addEventListener('input', EventHandlers.adjustTextareaHeight);
+                
+                EventHandlers.adjustTextareaHeight();
+                
+                try {
+                    const healthData = await SQLAgentAPI.checkHealth();
+                    UIManager.updateHealthStatus(healthData);
+                    
+                    const tablesData = await SQLAgentAPI.fetchTables();
+                    UIManager.renderTables(tablesData.tables);
+                    
+                } catch (error) {
+                    console.error('Initialization error:', error);
+                }
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', App.initialize);
+    </script>
+</body>
+</html>
