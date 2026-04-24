@@ -258,6 +258,7 @@
             border-radius: 18px;
             line-height: 1.5;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            overflow: hidden;
         }
 
         .user .message-content {
@@ -334,6 +335,16 @@
             border-collapse: collapse;
             font-size: 0.85rem;
             margin: 8px 0;
+            display: block;
+            max-height: 400px;
+            overflow-y: auto;
+            overflow-x: auto;
+        }
+
+        .data-table thead {
+            position: sticky;
+            top: 0;
+            z-index: 1;
         }
 
         .data-table th {
@@ -343,16 +354,38 @@
             text-align: left;
             font-weight: 600;
             border: none;
+            white-space: nowrap;
         }
 
         .data-table td {
             padding: 12px 16px;
             border-bottom: 1px solid var(--gray-light);
             vertical-align: top;
+            white-space: nowrap;
         }
 
         .data-table tr:hover {
             background: #f8f9fa;
+        }
+
+        /* Custom scrollbar for tables */
+        .data-table::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        .data-table::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+
+        .data-table::-webkit-scrollbar-thumb {
+            background: var(--primary);
+            border-radius: 4px;
+        }
+
+        .data-table::-webkit-scrollbar-thumb:hover {
+            background: var(--primary-dark);
         }
 
         .welcome-message {
@@ -499,8 +532,8 @@
 
     <script>
         // API Configuration - Change this to your deployed backend URL
-        // const API_BASE_URL = 'http://localhost:8000';
-        const API_BASE_URL = 'https://sql-agent-backend.vercel.app';
+        const API_BASE_URL = 'http://localhost:8000';
+        // const API_BASE_URL = 'https://sql-agent-backend.vercel.app';
 
         const elements = {
             chatInput: document.getElementById('chat-input'),
@@ -556,6 +589,29 @@
                 return html;
             }
 
+            static parseInlineMarkdown(text) {
+                if (!text) return text;
+                
+                // Escape HTML first to prevent XSS
+                let escaped = this.escapeHtml(text);
+                
+                // Parse bold: **text** or __text__
+                escaped = escaped.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+                escaped = escaped.replace(/__(.+?)__/g, '<strong>$1</strong>');
+                
+                // Parse italic: *text* or _text_
+                escaped = escaped.replace(/\*(.+?)\*/g, '<em>$1</em>');
+                escaped = escaped.replace(/_(.+?)_/g, '<em>$1</em>');
+                
+                // Parse inline code: `code`
+                escaped = escaped.replace(/`(.+?)`/g, '<code style="background: #f0f0f0; padding: 2px 6px; border-radius: 4px; font-family: monospace;">$1</code>');
+                
+                // Parse line breaks - convert \n to <br>
+                escaped = escaped.replace(/\n/g, '<br>');
+                
+                return escaped;
+            }
+
             static formatTextResponse(text) {
                 if (text.includes('|') && text.includes('-|-')) {
                     return this.formatMarkdownTable(text);
@@ -567,7 +623,9 @@
                     if (paragraph.includes('|') && paragraph.split('\n').some(line => line.includes('|'))) {
                         html += this.formatMarkdownTable(paragraph);
                     } else {
-                        html += `<p>${this.escapeHtml(paragraph)}</p>`;
+                        // Parse inline markdown before adding paragraph
+                        const parsed = this.parseInlineMarkdown(paragraph);
+                        html += `<p>${parsed}</p>`;
                     }
                 });
                 
